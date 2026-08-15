@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PaceRunner GPS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+  :root {
+    --bg:#0a0e14;--surface:#111722;--surface2:#1a2232;--border:#1e2d42;
+    --accent:#00e5a0;--warn:#ffb800;--danger:#ff4b4b;--ok:#0096ff;
+    --text:#e8f0fe;--muted:#5a7090;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;min-height:100vh;display:flex;flex-direction:column;overscroll-behavior:none;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .logo{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;letter-spacing:.12em;color:var(--accent);}
+  .logo span{color:var(--text);}
+  .status-pill{display:flex;align-items:center;gap:7px;font-size:.72rem;color:var(--muted);font-family:'Space Mono',monospace;background:var(--surface2);padding:5px 12px;border-radius:20px;border:1px solid var(--border);}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);}
+  .dot.gps{background:#ffb800;animation:pulse 1s infinite;}
+  .dot.running{background:var(--accent);animation:pulse 1s infinite;}
+  .dot.ok{background:var(--accent);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  main{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;max-width:420px;margin:0 auto;width:100%;}
+
+  /* PACE CENTRAL */
+  .pace-hero{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px 20px 18px;text-align:center;position:relative;}
+  .pace-ring{width:160px;height:160px;margin:0 auto 12px;position:relative;}
+  .pace-ring svg{width:100%;height:100%;}
+  .pace-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .pace-big{font-family:'Space Mono',monospace;font-size:2.4rem;font-weight:700;line-height:1;transition:color .3s;}
+  .pace-unit{font-size:.68rem;color:var(--muted);font-family:'Space Mono',monospace;margin-top:2px;}
+  .pace-target-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border);}
+  .target-lbl{font-size:.72rem;color:var(--muted);}
+  .target-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--accent);}
+  .diff-badge{font-size:.72rem;font-family:'Space Mono',monospace;padding:3px 8px;border-radius:20px;font-weight:600;}
+  .diff-badge.ok{background:rgba(0,150,255,.15);color:var(--ok);}
+  .diff-badge.fast{background:rgba(0,229,160,.15);color:var(--accent);}
+  .diff-badge.slow{background:rgba(255,75,75,.15);color:var(--danger);}
+
+  /* ALERTA */
+  .alert-box{border-radius:14px;padding:13px 16px;display:flex;align-items:center;gap:11px;font-size:.88rem;font-weight:600;border:1px solid transparent;transition:all .35s;min-height:54px;}
+  .alert-box.ok{background:rgba(0,150,255,.1);border-color:rgba(0,150,255,.3);color:var(--ok);}
+  .alert-box.fast{background:rgba(0,229,160,.1);border-color:rgba(0,229,160,.3);color:var(--accent);}
+  .alert-box.slow{background:rgba(255,75,75,.1);border-color:rgba(255,75,75,.3);color:var(--danger);}
+  .alert-box.neutral{background:var(--surface2);border-color:var(--border);color:var(--muted);}
+  .alert-icon{font-size:1.4rem;flex-shrink:0;}
+
+  /* MÉTRICAS */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .mcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 8px;text-align:center;}
+  .mval{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;}
+  .mlbl{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;}
+
+  /* BARRA DE PROGRESSO 100M */
+  .progress-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .prog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .prog-title{font-size:.68rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;font-family:'Space Mono',monospace;}
+  .prog-dist{font-family:'Space Mono',monospace;font-size:.85rem;color:var(--accent);font-weight:700;}
+  .prog-bar-bg{background:var(--surface2);border-radius:6px;height:10px;overflow:hidden;}
+  .prog-bar-fill{height:100%;border-radius:6px;transition:width .4s ease,background .3s;background:var(--accent);}
+  .prog-km-row{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;color:var(--muted);font-family:'Space Mono',monospace;}
+
+  /* GRÁFICO PACE */
+  .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .chart-title{font-size:.68rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;font-family:'Space Mono',monospace;margin-bottom:12px;}
+  .chart-inner{height:100px;position:relative;}
+  svg.live-chart{width:100%;height:100%;overflow:visible;}
+
+  /* CONTROLES */
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .btn{padding:16px;border:none;border-radius:14px;font-family:'Space Grotesk',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.02em;}
+  .btn-start{background:var(--accent);color:#0a0e14;}
+  .btn-start:active{transform:scale(.97);}
+  .btn-stop{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-stop:active{transform:scale(.97);}
+  .btn:disabled{opacity:.35;pointer-events:none;}
+
+  /* INFO GPS */
+  .gps-info{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-size:.72rem;color:var(--muted);line-height:1.7;}
+  .gps-info strong{color:var(--accent);}
+
+  /* MODELO INFO */
+  .model-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);border-radius:6px;padding:3px 8px;font-size:.65rem;font-family:'Space Mono',monospace;color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">PACE<span>Runner</span> <span class="model-tag">MA-5</span></div>
+  <div class="status-pill">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Aguardando GPS</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- PACE CENTRAL COM ANEL -->
+  <div class="pace-hero">
+    <div class="pace-ring">
+      <svg viewBox="0 0 160 160">
+        <!-- trilha -->
+        <circle cx="80" cy="80" r="68" fill="none" stroke="var(--border)" stroke-width="8"/>
+        <!-- arco de progresso do segmento de 100m -->
+        <circle id="ringArc" cx="80" cy="80" r="68" fill="none"
+          stroke="var(--accent)" stroke-width="8"
+          stroke-linecap="round"
+          stroke-dasharray="427" stroke-dashoffset="427"
+          transform="rotate(-90 80 80)"
+          style="transition:stroke-dashoffset .5s ease, stroke .3s;"/>
+      </svg>
+      <div class="pace-ring-text">
+        <div class="pace-big" id="paceDisplay">--:--</div>
+        <div class="pace-unit">min / km</div>
+      </div>
+    </div>
+    <div class="pace-target-row">
+      <span class="target-lbl">Alvo (MA-5):</span>
+      <span class="target-val" id="paceAlvo">5:13</span>
+      <span class="diff-badge ok" id="diffBadge">—</span>
+    </div>
+  </div>
+
+  <!-- ALERTA PRINCIPAL -->
+  <div class="alert-box neutral" id="alertBox">
+    <span class="alert-icon" id="alertIcon">📡</span>
+    <span id="alertMsg">Aguardando sinal GPS para iniciar rastreamento.</span>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <div class="metrics">
+    <div class="mcard">
+      <div class="mval" id="mDist">0.00</div>
+      <div class="mlbl">km total</div>
+    </div>
+    <div class="mcard">
+      <div class="mval" id="mKm">0</div>
+      <div class="mlbl">km atual</div>
+    </div>
+    <div class="mcard">
+      <div class="mval" id="mSeg">0</div>
+      <div class="mlbl">segmentos</div>
+    </div>
+    <div class="mcard">
+      <div class="mval" id="mTempo">0:00</div>
+      <div class="mlbl">tempo</div>
+    </div>
+  </div>
+
+  <!-- BARRA 100M -->
+  <div class="progress-wrap">
+    <div class="prog-header">
+      <span class="prog-title">Próximo alerta em</span>
+      <span class="prog-dist" id="progDist">100 m</span>
+    </div>
+    <div class="prog-bar-bg">
+      <div class="prog-bar-fill" id="progFill" style="width:0%"></div>
+    </div>
+    <div class="prog-km-row">
+      <span id="progKmLabel">km 0</span>
+      <span id="progKmNext">km 1</span>
+    </div>
+  </div>
+
+  <!-- GRÁFICO PACE AO VIVO -->
+  <div class="chart-wrap">
+    <div class="chart-title">Pace ao vivo — últimos segmentos de 100m</div>
+    <div class="chart-inner">
+      <svg class="live-chart" id="liveChart" viewBox="0 0 340 100"></svg>
+    </div>
+  </div>
+
+  <!-- CONTROLES -->
+  <div class="controls">
+    <button class="btn btn-start" id="btnStart" onclick="iniciar()">▶ Iniciar</button>
+    <button class="btn btn-stop" id="btnStop" onclick="parar()" disabled>■ Parar</button>
+  </div>
+
+  <!-- INFO -->
+  <div class="gps-info">
+    <strong>GPS ativo:</strong> pace calculado a cada 100m usando distância haversine entre coordenadas.<br>
+    <strong>Modelo MA-5:</strong> alvo calculado com média móvel dos últimos 5 treinos do banco de dados (677 treinos · corredor 1063624).<br>
+    <strong>Alerta:</strong> voz + vibração a cada 100m percorridos.
+  </div>
+
+</main>
+
+<script>
+// ── MODELO MA-5 (dados reais do banco) ───────────────────────────────────────
+// Últimos 5 paces médios do corredor 1063624:
+const ULTIMOS_5 = [5.0500, 5.1755, 5.6667, 4.3722, 5.3133];
+const PACE_ALVO = ULTIMOS_5.reduce((a,b)=>a+b,0) / ULTIMOS_5.length; // MA-5 = 5.11
+const TOL_OK   = 0.25; // ±15s/km = no alvo
+const TOL_WARN = 0.60; // >36s/km = longe demais
+
+// ── ESTADO ───────────────────────────────────────────────────────────────────
+let rodando = false;
+let watchId = null;
+let audioCtx = null;
+let synth = window.speechSynthesis;
+
+let distTotal    = 0;   // metros
+let distSegmento = 0;   // metros desde último alerta (100m)
+let kmAtual      = 0;
+let segmentos    = 0;   // quantos blocos de 100m completados
+let paceAtual    = 0;
+let ultimaPos    = null;
+let ultimoTempoPos = null;
+let segundos     = 0;
+let timerInterval = null;
+let historicoChart = []; // paces dos últimos 20 segmentos
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function fmt(v) {
+  if (!v || isNaN(v)) return '--:--';
+  const m = Math.floor(v);
+  const s = Math.round((v - m) * 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function fmtTempo(seg) {
+  const m = Math.floor(seg / 60);
+  const s = seg % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// Fórmula de Haversine — distância entre duas coords GPS em metros
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+            Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ── ÁUDIO + VOZ ──────────────────────────────────────────────────────────────
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function bip(freq, dur, delay = 0) {
+  if (!audioCtx) return;
+  setTimeout(() => {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = freq; o.type = 'sine';
+    g.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  }, delay);
+}
+
+function falarPace(tipo, paceVal) {
+  if (!synth) return;
+  synth.cancel();
+  const diffSec = Math.round((paceVal - PACE_ALVO) * 60);
+  const absDiff = Math.abs(diffSec);
+  let texto = '';
+
+  if (tipo === 'ok') {
+    texto = `Pace no alvo. ${fmt(paceVal)} por quilômetro.`;
+    bip(660, 0.2);
+  } else if (tipo === 'slow') {
+    texto = `Acelere ${absDiff} segundos por quilômetro. Pace atual ${fmt(paceVal)}.`;
+    bip(880, 0.15); bip(880, 0.15, 200); bip(880, 0.15, 400);
+  } else {
+    texto = `Reduza ${absDiff} segundos por quilômetro. Pace atual ${fmt(paceVal)}.`;
+    bip(440, 0.2); bip(440, 0.2, 250);
+  }
+
+  const utt = new SpeechSynthesisUtterance(texto);
+  utt.lang = 'pt-BR'; utt.rate = 1.1; utt.volume = 1;
+  synth.speak(utt);
+}
+
+function vibrar(tipo) {
+  if (!navigator.vibrate) return;
+  if (tipo === 'slow')    navigator.vibrate([250,100,250,100,250]);
+  else if (tipo === 'fast') navigator.vibrate([150,80,150]);
+  else                    navigator.vibrate(100);
+}
+
+function alertarCorredor(tipo, paceVal) {
+  falarPace(tipo, paceVal);
+  vibrar(tipo);
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+function setStatus(dotClass, texto) {
+  document.getElementById('statusDot').className = 'dot ' + dotClass;
+  document.getElementById('statusText').textContent = texto;
+}
+
+function atualizarAlerta(tipo, msg, icon) {
+  const box = document.getElementById('alertBox');
+  box.className = 'alert-box ' + tipo;
+  document.getElementById('alertIcon').textContent = icon;
+  document.getElementById('alertMsg').textContent = msg;
+}
+
+function atualizarPace(pace) {
+  const el = document.getElementById('paceDisplay');
+  el.textContent = fmt(pace);
+  const diff = pace - PACE_ALVO;
+  const diffSec = Math.round(diff * 60);
+  const badge = document.getElementById('diffBadge');
+  const sinal = diff > 0 ? '+' : '';
+
+  if (Math.abs(diff) <= TOL_OK) {
+    el.style.color = 'var(--ok)';
+    badge.className = 'diff-badge ok';
+    badge.textContent = sinal + diffSec + 's/km';
+    document.getElementById('ringArc').style.stroke = 'var(--ok)';
+    return 'ok';
+  } else if (diff > TOL_OK) {
+    el.style.color = 'var(--danger)';
+    badge.className = 'diff-badge slow';
+    badge.textContent = '+' + diffSec + 's/km';
+    document.getElementById('ringArc').style.stroke = 'var(--danger)';
+    return 'slow';
+  } else {
+    el.style.color = 'var(--accent)';
+    badge.className = 'diff-badge fast';
+    badge.textContent = diffSec + 's/km';
+    document.getElementById('ringArc').style.stroke = 'var(--accent)';
+    return 'fast';
+  }
+}
+
+function atualizarProgresso() {
+  const pct = Math.min((distSegmento / 100) * 100, 100);
+  document.getElementById('progFill').style.width = pct + '%';
+  const restante = Math.max(0, Math.round(100 - distSegmento));
+  document.getElementById('progDist').textContent = restante + ' m';
+  document.getElementById('progKmLabel').textContent = 'km ' + kmAtual;
+  document.getElementById('progKmNext').textContent = 'km ' + (kmAtual + 1);
+
+  // Anel de progresso (circunferência = 2π×68 ≈ 427)
+  const circ = 427;
+  const offset = circ - (pct / 100) * circ;
+  document.getElementById('ringArc').style.strokeDashoffset = offset;
+}
+
+function atualizarMetricas() {
+  document.getElementById('mDist').textContent = (distTotal / 1000).toFixed(2);
+  document.getElementById('mKm').textContent = kmAtual;
+  document.getElementById('mSeg').textContent = segmentos;
+  document.getElementById('mTempo').textContent = fmtTempo(segundos);
+}
+
+function atualizarChart() {
+  const svg = document.getElementById('liveChart');
+  svg.innerHTML = '';
+  if (historicoChart.length < 2) return;
+
+  const W = 340, H = 100;
+  const dados = historicoChart.slice(-20);
+  const n = dados.length;
+  const minV = Math.min(...dados, PACE_ALVO) - 0.3;
+  const maxV = Math.max(...dados, PACE_ALVO) + 0.3;
+  const xOf = i => (i / (n - 1)) * W;
+  const yOf = v => H - ((v - minV) / (maxV - minV)) * H;
+
+  // Linha alvo
+  const ya = yOf(PACE_ALVO);
+  const la = document.createElementNS('http://www.w3.org/2000/svg','line');
+  la.setAttribute('x1',0); la.setAttribute('x2',W);
+  la.setAttribute('y1',ya); la.setAttribute('y2',ya);
+  la.setAttribute('stroke','rgba(0,229,160,.3)');
+  la.setAttribute('stroke-dasharray','5 4'); la.setAttribute('stroke-width','1.5');
+  svg.appendChild(la);
+
+  // Label alvo
+  const lt = document.createElementNS('http://www.w3.org/2000/svg','text');
+  lt.setAttribute('x', W - 2); lt.setAttribute('y', ya - 4);
+  lt.setAttribute('text-anchor','end'); lt.setAttribute('font-size','9');
+  lt.setAttribute('fill','rgba(0,229,160,.6)'); lt.setAttribute('font-family','Space Mono,monospace');
+  lt.textContent = fmt(PACE_ALVO);
+  svg.appendChild(lt);
+
+  // Linha do pace ao vivo
+  let d = `M ${xOf(0)} ${yOf(dados[0])}`;
+  dados.forEach((v,i) => { if(i>0) d += ` L ${xOf(i)} ${yOf(v)}`; });
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',d); path.setAttribute('fill','none');
+  path.setAttribute('stroke','var(--accent)'); path.setAttribute('stroke-width','2');
+  path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round');
+  svg.appendChild(path);
+
+  // Ponto atual
+  const lx = xOf(n-1), ly = yOf(dados[n-1]);
+  const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  circ.setAttribute('cx',lx); circ.setAttribute('cy',ly);
+  circ.setAttribute('r','5'); circ.setAttribute('fill','var(--accent)');
+  svg.appendChild(circ);
+
+  // Valor atual
+  const tv = document.createElementNS('http://www.w3.org/2000/svg','text');
+  tv.setAttribute('x', Math.min(lx + 6, W - 30)); tv.setAttribute('y', Math.max(ly - 6, 10));
+  tv.setAttribute('font-size','9'); tv.setAttribute('fill','var(--accent)');
+  tv.setAttribute('font-family','Space Mono,monospace'); tv.setAttribute('font-weight','700');
+  tv.textContent = fmt(dados[n-1]);
+  svg.appendChild(tv);
+}
+
+// ── GPS HANDLER ───────────────────────────────────────────────────────────────
+function onPosicao(pos) {
+  const lat = pos.coords.latitude;
+  const lon = pos.coords.longitude;
+  const agora = Date.now();
+  const acc = pos.coords.accuracy;
+
+  // Precisão ruim → ignora
+  if (acc > 25) {
+    setStatus('gps', 'GPS fraco (' + Math.round(acc) + 'm)');
+    return;
+  }
+
+  if (!rodando) return;
+
+  if (ultimaPos) {
+    const dt_ms = agora - ultimoTempoPos;
+    const dist = haversine(ultimaPos.lat, ultimaPos.lon, lat, lon);
+
+    // Filtro: ignora leituras com distância impossível (> 10 m/s = 36 km/h)
+    const velMs = dist / (dt_ms / 1000);
+    if (velMs > 10) { ultimaPos = {lat, lon}; ultimoTempoPos = agora; return; }
+
+    distTotal    += dist;
+    distSegmento += dist;
+
+    // Pace instantâneo (min/km) — média suavizada dos últimos 100m
+    // Se dt muito pequeno, usa o pace acumulado do segmento atual
+    if (dt_ms > 500 && dist > 0.5) {
+      const velocidadeMps = dist / (dt_ms / 1000);
+      paceAtual = (1000 / velocidadeMps) / 60; // min/km
+      paceAtual = Math.min(Math.max(paceAtual, 2.5), 12); // clamp razoável
+    }
+
+    // Quilômetro completado
+    const novoKm = Math.floor(distTotal / 1000);
+    if (novoKm > kmAtual) kmAtual = novoKm;
+
+    // ALERTA A CADA 100M
+    if (distSegmento >= 100) {
+      distSegmento -= 100;
+      segmentos++;
+      historicoChart.push(paceAtual);
+
+      const tipo = atualizarPace(paceAtual);
+
+      let icon, msg;
+      if (tipo === 'ok') {
+        icon = '✅'; msg = `Pace no alvo! ${fmt(paceAtual)} min/km — continue assim.`;
+        atualizarAlerta('fast', msg, icon);
+      } else if (tipo === 'slow') {
+        const d = Math.round((paceAtual - PACE_ALVO)*60);
+        icon = '🔔'; msg = `Acelere! +${d}s acima do alvo. Atual: ${fmt(paceAtual)} min/km.`;
+        atualizarAlerta('slow', msg, icon);
+      } else {
+        const d = Math.round((PACE_ALVO - paceAtual)*60);
+        icon = '⚡'; msg = `Reduza! ${d}s abaixo do alvo. Atual: ${fmt(paceAtual)} min/km.`;
+        atualizarAlerta('ok', msg, icon);
+      }
+
+      alertarCorredor(tipo, paceAtual);
+      atualizarChart();
+    } else {
+      // Atualiza display de pace em tempo real (sem alertar)
+      if (paceAtual > 0) atualizarPace(paceAtual);
+    }
+
+    atualizarProgresso();
+    atualizarMetricas();
+  }
+
+  ultimaPos = {lat, lon};
+  ultimoTempoPos = agora;
+  setStatus('running', 'GPS ativo · ' + Math.round(acc) + 'm');
+}
+
+function onErroPOS(err) {
+  let msg = 'Erro GPS';
+  if (err.code === 1) msg = 'Permissão GPS negada';
+  else if (err.code === 2) msg = 'GPS indisponível';
+  else if (err.code === 3) msg = 'GPS timeout';
+  setStatus('', msg);
+  atualizarAlerta('slow', '⚠️ ' + msg + '. Verifique as permissões de localização.', '⚠️');
+}
+
+// ── CONTROLES ────────────────────────────────────────────────────────────────
+function iniciar() {
+  if (!navigator.geolocation) {
+    atualizarAlerta('slow', 'Seu navegador não suporta GPS.', '⚠️');
+    return;
+  }
+
+  initAudio();
+  rodando = true;
+  distTotal = 0; distSegmento = 0; kmAtual = 0;
+  segmentos = 0; segundos = 0; paceAtual = 0;
+  ultimaPos = null; ultimoTempoPos = null;
+  historicoChart = [];
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  setStatus('gps', 'Buscando GPS...');
+  atualizarAlerta('neutral', 'Aguardando sinal GPS. Fique parado por 3 segundos para calibrar.', '📡');
+
+  document.getElementById('paceAlvo').textContent = fmt(PACE_ALVO);
+  atualizarProgresso();
+
+  // Timer de tempo total
+  timerInterval = setInterval(() => { segundos++; atualizarMetricas(); }, 1000);
+
+  // GPS watch
+  watchId = navigator.geolocation.watchPosition(onPosicao, onErroPOS, {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 10000
+  });
+}
+
+function parar() {
+  rodando = false;
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  clearInterval(timerInterval);
+
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  setStatus('ok', 'Finalizado');
+
+  const distKm = (distTotal / 1000).toFixed(2);
+  const paceMedia = distTotal > 0 ? (segundos / 60) / (distTotal / 1000) : 0;
+  atualizarAlerta('fast',
+    `🏁 Treino encerrado! ${distKm} km · Pace médio: ${fmt(paceMedia)} · Tempo: ${fmtTempo(segundos)}`,
+    '🏁'
+  );
+
+  if (synth) synth.cancel();
+  const utt = new SpeechSynthesisUtterance(
+    `Treino encerrado. ${distKm} quilômetros em ${fmtTempo(segundos)}. Pace médio ${fmt(paceMedia)} por quilômetro.`
+  );
+  utt.lang = 'pt-BR'; utt.rate = 1;
+  if (synth) synth.speak(utt);
+  navigator.vibrate && navigator.vibrate([300,100,300,100,300]);
+}
+
+// Init
+document.getElementById('paceAlvo').textContent = fmt(PACE_ALVO);
+</script>
+</body>
+</html>
