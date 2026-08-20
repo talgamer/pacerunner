@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PaceRunner GPS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+  :root {
+    --bg:#0a0e14;--surface:#111722;--surface2:#1a2232;--border:#1e2d42;
+    --accent:#00e5a0;--warn:#ffb800;--danger:#ff4b4b;--ok:#0096ff;
+    --text:#e8f0fe;--muted:#5a7090;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;min-height:100vh;display:flex;flex-direction:column;overscroll-behavior:none;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .logo{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;letter-spacing:.12em;color:var(--accent);}
+  .logo span{color:var(--text);}
+  .status-pill{display:flex;align-items:center;gap:7px;font-size:.72rem;color:var(--muted);font-family:'Space Mono',monospace;background:var(--surface2);padding:5px 12px;border-radius:20px;border:1px solid var(--border);}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);}
+  .dot.gps{background:#ffb800;animation:pulse 1s infinite;}
+  .dot.running{background:var(--accent);animation:pulse 1s infinite;}
+  .dot.ok{background:var(--accent);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  main{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;max-width:420px;margin:0 auto;width:100%;}
+
+  /* SETUP */
+  .setup-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;}
+  .setup-title{font-size:.65rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;font-family:'Space Mono',monospace;margin-bottom:12px;}
+  .setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .setup-field{display:flex;flex-direction:column;gap:4px;}
+  .setup-field label{font-size:.68rem;color:var(--muted);}
+  .setup-field input,.setup-field select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'Space Mono',monospace;font-size:.82rem;width:100%;}
+  .setup-field input:focus,.setup-field select:focus{outline:none;border-color:var(--accent);}
+  .setup-field select option{background:var(--surface2);}
+  .setup-note{font-size:.62rem;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .setup-note strong{color:var(--accent);}
+
+  /* ZONA FC */
+  .zona-card{border-radius:14px;padding:14px 16px;border:2px solid transparent;transition:all .35s;}
+  .zona-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .zona-badge{font-family:"Space Mono",monospace;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;color:#fff;}
+  .zona-bpm-row{display:flex;align-items:baseline;gap:6px;}
+  .zona-bpm{font-family:"Space Mono",monospace;font-size:2rem;font-weight:700;line-height:1;}
+  .zona-bpm-unit{font-size:.62rem;color:var(--muted);font-family:"Space Mono",monospace;}
+  .zona-alerta{font-size:.85rem;font-weight:700;margin-top:6px;}
+  .zona-detalhe{font-size:.7rem;color:var(--muted);margin-top:3px;line-height:1.5;}
+  .zona-bar-bg{background:var(--surface2);border-radius:4px;height:7px;overflow:hidden;margin-top:10px;}
+  .zona-bar-fill{height:100%;border-radius:4px;transition:width .6s ease,background .3s;}
+
+  /* PACE CENTRAL */
+  .pace-hero{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px 20px 18px;text-align:center;position:relative;}
+  .pace-ring{width:160px;height:160px;margin:0 auto 12px;position:relative;}
+  .pace-ring svg{width:100%;height:100%;}
+  .pace-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .pace-big{font-family:'Space Mono',monospace;font-size:2.4rem;font-weight:700;line-height:1;transition:color .3s;}
+  .pace-unit{font-size:.68rem;color:var(--muted);font-family:'Space Mono',monospace;margin-top:2px;}
+  .pace-target-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .target-lbl{font-size:.72rem;color:var(--muted);}
+  .target-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--accent);}
+  .diff-badge{font-size:.72rem;font-family:'Space Mono',monospace;padding:3px 8px;border-radius:20px;font-weight:600;}
+  .diff-badge.ok{background:rgba(0,150,255,.15);color:var(--ok);}
+  .diff-badge.fast{background:rgba(0,229,160,.15);color:var(--accent);}
+  .diff-badge.slow{background:rgba(255,75,75,.15);color:var(--danger);}
+  .km-info{font-size:.62rem;color:var(--muted);font-family:'Space Mono',monospace;margin-top:5px;}
+
+  /* ALERTA */
+  .alert-box{border-radius:14px;padding:13px 16px;display:flex;align-items:center;gap:11px;font-size:.88rem;font-weight:600;border:1px solid transparent;transition:all .35s;min-height:54px;}
+  .alert-box.ok{background:rgba(0,150,255,.1);border-color:rgba(0,150,255,.3);color:var(--ok);}
+  .alert-box.fast{background:rgba(0,229,160,.1);border-color:rgba(0,229,160,.3);color:var(--accent);}
+  .alert-box.slow{background:rgba(255,75,75,.1);border-color:rgba(255,75,75,.3);color:var(--danger);}
+  .alert-box.neutral{background:var(--surface2);border-color:var(--border);color:var(--muted);}
+  .alert-icon{font-size:1.4rem;flex-shrink:0;}
+
+  /* MÉTRICAS */
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .mcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 8px;text-align:center;}
+  .mval{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;}
+  .mlbl{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;}
+
+  /* ELEVAÇÃO */
+  .elev-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .elev-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 8px;text-align:center;}
+  .elev-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--warn);}
+  .elev-lbl{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px;}
+
+  /* BARRA 100M */
+  .progress-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .prog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .prog-title{font-size:.68rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;font-family:'Space Mono',monospace;}
+  .prog-dist{font-family:'Space Mono',monospace;font-size:.85rem;color:var(--accent);font-weight:700;}
+  .prog-bar-bg{background:var(--surface2);border-radius:6px;height:10px;overflow:hidden;}
+  .prog-bar-fill{height:100%;border-radius:6px;transition:width .4s ease,background .3s;background:var(--accent);}
+  .prog-km-row{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;color:var(--muted);font-family:'Space Mono',monospace;}
+
+  /* GRÁFICO */
+  .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .chart-title{font-size:.68rem;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;font-family:'Space Mono',monospace;margin-bottom:12px;}
+  .chart-inner{height:100px;position:relative;}
+  svg.live-chart{width:100%;height:100%;overflow:visible;}
+
+  /* CONTROLES */
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .btn{padding:16px;border:none;border-radius:14px;font-family:'Space Grotesk',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.02em;}
+  .btn-start{background:var(--accent);color:#0a0e14;}
+  .btn-start:active{transform:scale(.97);}
+  .btn-stop{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-stop:active{transform:scale(.97);}
+  .btn:disabled{opacity:.35;pointer-events:none;}
+
+  /* INFO */
+  .gps-info{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-size:.72rem;color:var(--muted);line-height:1.7;}
+  .gps-info strong{color:var(--accent);}
+  .model-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);border-radius:6px;padding:3px 8px;font-size:.65rem;font-family:'Space Mono',monospace;color:var(--accent);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">PACE<span>Runner</span> <span class="model-tag">Reg. Linear</span></div>
+  <div class="status-pill">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Aguardando GPS</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- PERFIL -->
+  <div class="setup-card" id="setupCard">
+    <div class="setup-title">Perfil do corredor</div>
+    <div class="setup-grid">
+      <div class="setup-field">
+        <label>Gênero</label>
+        <select id="inGenero">
+          <option value="male">Masculino</option>
+          <option value="female">Feminino</option>
+          <option value="unknown">Prefiro não informar</option>
+        </select>
+      </div>
+      <div class="setup-field">
+        <label>Pace histórico (min/km)</label>
+        <input id="inHistorico" type="number" step="0.1" min="3" max="12" value="5.5">
+      </div>
+      <div class="setup-field">
+        <label>Distância planejada (km)</label>
+        <input id="inDistTotal" type="number" step="1" min="1" max="100" value="10">
+      </div>
+      <div class="setup-field">
+        <label>Dist. média treinos (km)</label>
+        <input id="inDistMedia" type="number" step="0.5" min="1" max="100" value="13.2">
+      </div>
+      <div class="setup-field">
+        <label>Nº de treinos anteriores</label>
+        <input id="inNTreinos" type="number" step="1" min="0" max="500" value="51">
+      </div>
+      <div class="setup-field">
+        <label>Idade (anos)</label>
+        <input id="inIdade" type="number" step="1" min="10" max="90" value="30" title="Usada para calcular FC máxima: 220 - idade">
+      </div>
+    </div>
+    <div class="setup-note">
+      <strong>Dist. média</strong> e <strong>Nº treinos</strong>: padrões = medianas reais do treino (13,18 km · 51 treinos).
+    </div>
+  </div>
+
+  <!-- PACE CENTRAL -->
+  <div class="pace-hero">
+    <div class="pace-ring">
+      <svg viewBox="0 0 160 160">
+        <circle cx="80" cy="80" r="68" fill="none" stroke="var(--border)" stroke-width="8"/>
+        <circle id="ringArc" cx="80" cy="80" r="68" fill="none"
+          stroke="var(--accent)" stroke-width="8"
+          stroke-linecap="round"
+          stroke-dasharray="427" stroke-dashoffset="427"
+          transform="rotate(-90 80 80)"
+          style="transition:stroke-dashoffset .5s ease, stroke .3s;"/>
+      </svg>
+      <div class="pace-ring-text">
+        <div class="pace-big" id="paceDisplay">--:--</div>
+        <div class="pace-unit">min / km</div>
+      </div>
+    </div>
+    <div class="pace-target-row">
+      <span class="target-lbl">Alvo (modelo):</span>
+      <span class="target-val" id="paceAlvo">--:--</span>
+      <span class="diff-badge ok" id="diffBadge">—</span>
+    </div>
+    <div class="km-info" id="kmInfo">km 1 · modelo atualiza a cada quilômetro</div>
+  </div>
+
+  <!-- ALERTA -->
+  <div class="alert-box neutral" id="alertBox">
+    <span class="alert-icon" id="alertIcon">📡</span>
+    <span id="alertMsg">Preencha o perfil e clique em Iniciar.</span>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <div class="metrics">
+    <div class="mcard"><div class="mval" id="mDist">0.00</div><div class="mlbl">km total</div></div>
+    <div class="mcard"><div class="mval" id="mKm">1</div><div class="mlbl">km atual</div></div>
+    <div class="mcard"><div class="mval" id="mSeg">0</div><div class="mlbl">alertas</div></div>
+    <div class="mcard"><div class="mval" id="mTempo">0:00</div><div class="mlbl">tempo</div></div>
+  </div>
+
+  <!-- ZONA FC -->
+  <div class="zona-card" id="zonaCard" style="background:var(--surface);border-color:var(--border);">
+    <div class="zona-header">
+      <div>
+        <span class="zona-badge" id="zonaBadge" style="background:#5a7090">— ZONA —</span>
+        <div class="zona-bpm-row" style="margin-top:6px">
+          <span class="zona-bpm" id="zonaBpm">---</span>
+          <span class="zona-bpm-unit">bpm simulado</span>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.62rem;color:var(--muted);font-family:Space Mono,monospace">FC máx</div>
+        <div style="font-family:Space Mono,monospace;font-weight:700;font-size:.95rem" id="zonaFcMax">---</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:2px">220 − idade</div>
+      </div>
+    </div>
+    <div class="zona-alerta" id="zonaAlerta">Aguardando GPS...</div>
+    <div class="zona-detalhe" id="zonaDetalhe">Inicie o treino para ver a zona de treinamento</div>
+    <div class="zona-bar-bg">
+      <div class="zona-bar-fill" id="zonaBarFill" style="width:0%;background:#5a7090"></div>
+    </div>
+  </div>
+
+  <!-- ELEVAÇÃO -->
+  <div class="elev-row">
+    <div class="elev-card"><div class="elev-val" id="eGanho">0 m</div><div class="elev-lbl">↑ Ganho km</div></div>
+    <div class="elev-card"><div class="elev-val" id="ePerda">0 m</div><div class="elev-lbl">↓ Perda km</div></div>
+    <div class="elev-card"><div class="elev-val" id="eIncl">n/d</div><div class="elev-lbl">Inclinação</div></div>
+  </div>
+
+  <!-- BARRA 100M -->
+  <div class="progress-wrap">
+    <div class="prog-header">
+      <span class="prog-title">Próximo alerta em</span>
+      <span class="prog-dist" id="progDist">100 m</span>
+    </div>
+    <div class="prog-bar-bg">
+      <div class="prog-bar-fill" id="progFill" style="width:0%"></div>
+    </div>
+    <div class="prog-km-row">
+      <span id="progKmLabel">km 0</span>
+      <span id="progKmNext">km 1</span>
+    </div>
+  </div>
+
+  <!-- GRÁFICO -->
+  <div class="chart-wrap">
+    <div class="chart-title">Pace ao vivo vs. alvo — alertas a cada 100m</div>
+    <div class="chart-inner">
+      <svg class="live-chart" id="liveChart" viewBox="0 0 340 100"></svg>
+    </div>
+  </div>
+
+  <!-- PAINEL DE APRENDIZADO -->
+  <div class="chart-wrap" id="painelAdaptacao" style="display:none">
+    <div class="chart-title">🧠 Modelo aprendendo — adaptações por km</div>
+    <div id="adaptacaoLista" style="font-family:'Space Mono',monospace;font-size:.7rem;line-height:2;"></div>
+    <div style="margin-top:8px;font-size:.62rem;color:var(--muted);">
+      Erro negativo = você foi mais rápido que o previsto · Positivo = mais lento<br>
+      O modelo ajusta os coeficientes a cada km para errar menos.
+    </div>
+  </div>
+
+  <!-- CONTROLES -->
+  <div class="controls">
+    <button class="btn btn-start" id="btnStart" onclick="iniciar()">▶ Iniciar</button>
+    <button class="btn btn-stop"  id="btnStop"  onclick="parar()" disabled>■ Parar</button>
+  </div>
+
+  <!-- INFO -->
+  <div class="gps-info">
+    <strong>Modelo:</strong> Regressão Linear — 477.431 segmentos de km · MAE 30,87 s/km<br>
+    <strong>GPS:</strong> pace calculado a cada 100m via haversine · alerta: voz + vibração<br>
+    <strong>Features:</strong> n_segmento · inclinação GPS · ganho/perda elevação por km · pace histórico · gênero
+  </div>
+
+</main>
+
+<script type="module">
+// ═══════════════════════════════════════════════════════════════════════════
+// MODELO ADAPTATIVO — Regressão Linear com Gradiente Descendente Online
+//
+// COMO FUNCIONA:
+// 1. Começa com os coeficientes treinados no notebook (ponto de partida)
+// 2. A cada km concluído, compara o pace previsto com o pace real
+// 3. Calcula o erro e ajusta os coeficientes na direção que reduz esse erro
+// 4. Quanto mais km você corre, mais o modelo aprende o SEU ritmo
+//
+// FÓRMULA DE ATUALIZAÇÃO (Gradiente Descendente):
+//   coef = coef - taxa_aprendizado × erro × feature
+//
+// Saída: segundos/km → ÷60 = min/km
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Coeficientes iniciais do notebook (ponto de partida do aprendizado)
+const COEFS_INICIAIS = {
+  intercepto:                    41.476481,
+  n_segmento:                    0.143125,
+  distancia_inicio_km:           0.143125,
+  distancia_total_treino_km:    -0.036056,
+  fracao_percurso:              -5.828742,
+  ganho_elevacao_m:              0.401404,
+  perda_elevacao_m:              0.665051,
+  inclinacao_media_pct:          5.419070,
+  ritmo_medio_historico_min_km: 52.709085,
+  dist_media_historica_km:      -0.268281,
+  n_treinos_anteriores:         -0.005779,
+  genero_female:                 0.884668,
+  genero_male:                  -2.445534,
+  genero_unknown:                1.560866,
+};
+
+// Taxa de aprendizado — controla o quanto o modelo se ajusta a cada km
+// Valor pequeno = aprendizado conservador (mais estável)
+// Valor maior = aprende mais rápido mas pode oscilar
+const TAXA_APRENDIZADO = 0.001;
+
+// Coeficientes atuais (começam iguais aos do notebook e vão se adaptando)
+let coefs = { ...COEFS_INICIAIS };
+
+// Histórico de adaptações para mostrar na tela
+let historicoAdaptacoes = [];
+
+// Monta o vetor de features de um km
+function montarFeatures(nSeg, distTotal, genero, historico, distMedia, nTreinos, ganho, perda, incl) {
+  const inclClamped = Math.max(-15.8, Math.min(13.5, incl));
+  return {
+    n_segmento:                    nSeg,
+    distancia_inicio_km:           nSeg - 1,
+    distancia_total_treino_km:     distTotal,
+    fracao_percurso:               nSeg / distTotal,
+    ganho_elevacao_m:              ganho,
+    perda_elevacao_m:              perda,
+    inclinacao_media_pct:          inclClamped,
+    ritmo_medio_historico_min_km:  historico,
+    dist_media_historica_km:       distMedia,
+    n_treinos_anteriores:          nTreinos,
+    genero_female:  genero === 'female'  ? 1 : 0,
+    genero_male:    genero === 'male'    ? 1 : 0,
+    genero_unknown: genero === 'unknown' ? 1 : 0,
+  };
+}
+
+// Previsão com os coeficientes atuais
+function calcPaceAlvo(nSeg, distTotal, genero, historico, distMedia, nTreinos, ganho, perda, incl) {
+  const feats = montarFeatures(nSeg, distTotal, genero, historico, distMedia, nTreinos, ganho, perda, incl);
+  let y = coefs.intercepto;
+  for (const [k, v] of Object.entries(feats)) {
+    if (coefs[k] !== undefined) y += coefs[k] * v;
+  }
+  return y / 60; // s/km → min/km
+}
+
+// Atualização dos coeficientes ao fim de cada km (Gradiente Descendente Online)
+// paceReal = pace que o corredor realmente fez no km (min/km)
+// nSeg, ... = features do km que acabou de ser completado
+function adaptarModelo(paceReal, nSeg, distTotal, genero, historico, distMedia, nTreinos, ganho, perda, incl) {
+  const feats = montarFeatures(nSeg, distTotal, genero, historico, distMedia, nTreinos, ganho, perda, incl);
+
+  // Previsão em s/km (mesma unidade do treinamento)
+  let prevSeg = coefs.intercepto;
+  for (const [k, v] of Object.entries(feats)) {
+    if (coefs[k] !== undefined) prevSeg += coefs[k] * v;
+  }
+
+  // Real em s/km
+  const realSeg = paceReal * 60;
+
+  // Erro: diferença entre previsto e real (em s/km)
+  const erro = prevSeg - realSeg;
+
+  // Atualizar intercepto
+  coefs.intercepto -= TAXA_APRENDIZADO * erro;
+
+  // Atualizar cada coeficiente
+  for (const [k, v] of Object.entries(feats)) {
+    if (coefs[k] !== undefined) {
+      coefs[k] -= TAXA_APRENDIZADO * erro * v;
+    }
+  }
+
+  // Registrar adaptação para exibição
+  historicoAdaptacoes.push({
+    km: nSeg,
+    errSec: Math.round(erro),    // erro em segundos
+    previsto: Math.round(prevSeg / 60 * 100) / 100,
+    real: Math.round(realSeg / 60 * 100) / 100,
+  });
+
+  // Atualizar painel de adaptação na tela
+  atualizarPainelAdaptacao();
+}
+
+// Reseta coeficientes para o início de cada nova corrida
+function resetarModelo() {
+  coefs = { ...COEFS_INICIAIS };
+  historicoAdaptacoes = [];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ZONAS DE TREINAMENTO — lógica extraída do Painel_Corredores_corrigido.html
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Definição das 5 zonas (igual à imagem e ao painel do Angelo)
+const ZONAS = [
+  { idx:0, nome:'Zona 1 — Leve',     minPct:.50, maxPct:.60, cor:'#2196F3', corFundo:'rgba(33,150,243,.12)'  },
+  { idx:1, nome:'Zona 2 — Moderado', minPct:.60, maxPct:.70, cor:'#26A69A', corFundo:'rgba(38,166,154,.12)'  },
+  { idx:2, nome:'Zona 3 — Médio',    minPct:.70, maxPct:.80, cor:'#FDD835', corFundo:'rgba(253,216,53,.12)'  },
+  { idx:3, nome:'Zona 4 — Intenso',  minPct:.80, maxPct:.90, cor:'#F4511E', corFundo:'rgba(244,81,30,.12)'   },
+  { idx:4, nome:'Zona 5 — Máximo',   minPct:.90, maxPct:1.0, cor:'#D32F2F', corFundo:'rgba(211,47,47,.12)'   },
+];
+
+// Alertas do painel do Angelo (adaptados para o app)
+const ALERTAS_ZONA = {
+  caminhar:   { nivel:'🚶 Caminhar',    cor:'#e0503f', detalhe:'Reduza para uma caminhada até os batimentos estabilizarem.' },
+  trotar:     { nivel:'🐢 Trotar',      cor:'#e0954f', detalhe:'Baixe para um trote leve e recupere o fôlego.' },
+  correr:     { nivel:'✅ Manter',      cor:'#2fb8a6', detalhe:'Mantenha o ritmo de corrida atual.' },
+  correrMais: { nivel:'⚡ Acelerar',    cor:'#7bd66a', detalhe:'Esforço ainda controlado — pode acelerar o passo.' },
+  explosao:   { nivel:'🚀 Explosão',    cor:'#c96bd6', detalhe:'Janela ideal para um tiro forte ou arrancada!' },
+};
+
+// Determinar zona com base na FC atual e FC máxima
+function determinarZona(fcAtual, fcMax) {
+  const pct = fcAtual / fcMax;
+  for (let i = ZONAS.length - 1; i >= 0; i--) {
+    if (pct >= ZONAS[i].minPct) return { zona: ZONAS[i], pct };
+  }
+  return { zona: ZONAS[0], pct };
+}
+
+// Alerta de saúde — mesma lógica do painel do Angelo
+// score: 1 (rápido) a 10 (lento) baseado no pace atual vs alvo
+function determinarAlerta(zoneIdx, paceAtual, paceAlvo) {
+  const fcMuitoAlta    = zoneIdx >= 3; // Zona 4 ou 5
+  const diffPct        = paceAlvo > 0 ? (paceAtual - paceAlvo) / paceAlvo : 0;
+  const ritmoMuitoLento = diffPct > 0.15; // >15% acima do alvo = muito lento
+
+  // PRIORIDADE 1 — FC muito elevada
+  if (fcMuitoAlta) {
+    return zoneIdx === 4 ? ALERTAS_ZONA.caminhar : ALERTAS_ZONA.trotar;
+  }
+  // PRIORIDADE 2 — Ritmo muito lento com FC ok
+  if (ritmoMuitoLento) return ALERTAS_ZONA.correrMais;
+  // Zona 1 e ritmo ótimo → janela de explosão
+  if (zoneIdx === 0 && diffPct < -0.05) return ALERTAS_ZONA.explosao;
+  // Zona 1/2 e lento → acelerar
+  if (zoneIdx <= 1 && diffPct > 0.05) return ALERTAS_ZONA.correrMais;
+  // Default → manter
+  return ALERTAS_ZONA.correr;
+}
+
+// Simulação de FC a partir do pace (baseada na relação pace↔FC do painel do Angelo)
+// Quanto mais rápido o pace, maior a FC esperada.
+// Usa a FC máxima do corredor para escalar o resultado.
+let fcSimulada = 0;
+let fcBuffer   = []; // suavização da FC
+
+function simularFC(paceAtual, paceAlvo, fcMax) {
+  if (!paceAtual || paceAtual <= 0 || !paceAlvo || paceAlvo <= 0) return fcSimulada || Math.round(fcMax * 0.65);
+
+  // Relação: pace mais rápido que o alvo → FC mais alta (mais esforço)
+  //          pace mais lento que o alvo  → FC mais baixa (menos esforço)
+  const ratio = paceAlvo / paceAtual; // >1 = mais rápido, <1 = mais lento
+
+  // Zona base esperada: 65%-80% da FC máx para pace no alvo
+  // Ajuste proporcional ao desvio de pace
+  const pctBase = 0.72; // FC alvo = 72% do fcMax quando no pace certo
+  const pctAjustado = Math.max(0.45, Math.min(0.98, pctBase * ratio + (1 - ratio) * 0.55));
+  const fcAlvo = fcMax * pctAjustado;
+
+  // Suavização exponencial (igual ao painel do Angelo: alpha=0.6)
+  const alpha = 0.4;
+  fcSimulada = fcSimulada > 0
+    ? Math.round(fcSimulada * (1 - alpha) + fcAlvo * alpha)
+    : Math.round(fcAlvo);
+
+  // Ruído leve para parecer natural (±3 bpm)
+  fcSimulada += Math.round((Math.random() - 0.5) * 6);
+  fcSimulada = Math.max(Math.round(fcMax * 0.45), Math.min(fcMax, fcSimulada));
+
+  return fcSimulada;
+}
+
+// Atualizar card de zona FC na tela
+function atualizarZonaFC(paceAtual, paceAlvo) {
+  if (!CFG.fcMax || paceAtual <= 0) return;
+
+  const fc = simularFC(paceAtual, paceAlvo, CFG.fcMax);
+  const { zona, pct } = determinarZona(fc, CFG.fcMax);
+  const alerta = determinarAlerta(zona.idx, paceAtual, paceAlvo);
+
+  // Card visual
+  const card = document.getElementById("zonaCard");
+  card.style.background    = zona.corFundo;
+  card.style.borderColor   = zona.cor;
+
+  document.getElementById("zonaBadge").textContent   = zona.nome;
+  document.getElementById("zonaBadge").style.background = zona.cor;
+  document.getElementById("zonaBpm").textContent     = fc;
+  document.getElementById("zonaBpm").style.color     = zona.cor;
+  document.getElementById("zonaFcMax").textContent   = CFG.fcMax + " bpm";
+  document.getElementById("zonaAlerta").textContent  = alerta.nivel;
+  document.getElementById("zonaAlerta").style.color  = alerta.cor;
+  document.getElementById("zonaDetalhe").textContent = alerta.detalhe;
+
+  // Barra de progresso dentro da zona
+  const barPct = Math.min(100, Math.round((pct - zona.minPct) / (zona.maxPct - zona.minPct) * 100));
+  document.getElementById("zonaBarFill").style.width      = barPct + "%";
+  document.getElementById("zonaBarFill").style.background = zona.cor;
+
+  // Alerta sonoro de saúde se FC muito alta (zona 4 ou 5) — a cada km
+  return { fc, zona, alerta };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════════════════════════════════════════
+let rodando = false;
+let watchId = null;
+let audioCtx = null;
+let synth = window.speechSynthesis;
+
+// GPS / distância
+let distTotal    = 0;   // metros total
+let distSegmento = 0;   // metros desde último alerta 100m
+let distKmAtual  = 0;   // metros percorridos no km atual
+let nSegmento    = 1;   // quilômetro atual (1, 2, 3...)
+let segmentos    = 0;   // alertas de 100m emitidos
+let paceAtual    = 0;
+let ultimaPos    = null;
+let ultimoTempoPos = null;
+let segundos     = 0;
+let timerInterval = null;
+let paceBuffer   = [];  // suavização
+let historicoChart = [];
+let historicoAlvo  = [];
+
+// Elevação (por km atual)
+let eleKmInicio  = null;  // altitude no início do km atual
+let eleAtual     = null;  // última altitude válida
+let ganhoKm      = 0;
+let perdaKm      = 0;
+let altDisp      = false; // GPS fornece altitude?
+
+// Config usuário
+let CFG = {};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════════════
+function fmt(v) {
+  if (!v || isNaN(v) || v <= 0) return '--:--';
+  const m = Math.floor(v), s = Math.round((v - m) * 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+function fmtTempo(seg) {
+  const m = Math.floor(seg / 60), s = seg % 60;
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function suavizarPace(v) {
+  if (v < 2 || v > 20) return;
+  paceBuffer.push(v);
+  if (paceBuffer.length > 5) paceBuffer.shift();
+}
+function getPace() {
+  if (!paceBuffer.length) return 0;
+  return paceBuffer.reduce((a,b)=>a+b,0) / paceBuffer.length;
+}
+function getInclinacao() {
+  if (!altDisp || eleKmInicio === null || eleAtual === null || distKmAtual < 10) return 0;
+  return ((eleAtual - eleKmInicio) / distKmAtual) * 100;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ÁUDIO + VOZ  — idêntico ao 1.html
+// ═══════════════════════════════════════════════════════════════════════════
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function bip(freq, dur, delay=0) {
+  if (!audioCtx) return;
+  setTimeout(() => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = freq; o.type = 'sine';
+    g.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  }, delay);
+}
+function falarPace(tipo, paceVal, alvoVal) {
+  if (!synth) return;
+  synth.cancel();
+  const diffSec = Math.round(Math.abs(paceVal - alvoVal) * 60);
+  let texto;
+  if (tipo === 'ok') {
+    texto = 'Pace no alvo. Continue assim.';
+    bip(660, 0.2);
+  } else if (tipo === 'slow') {
+    texto = `Acelere. ${diffSec} segundos acima do alvo.`;
+    bip(880, 0.15); bip(880, 0.15, 200); bip(880, 0.15, 400);
+  } else {
+    texto = `Reduza o ritmo. ${diffSec} segundos abaixo do alvo.`;
+    bip(440, 0.2); bip(440, 0.2, 250);
+  }
+  const utt = new SpeechSynthesisUtterance(texto);
+  utt.lang = 'pt-BR'; utt.rate = 1.1; utt.volume = 1;
+  synth.speak(utt);
+}
+function vibrar(tipo) {
+  if (!navigator.vibrate) return;
+  if (tipo === 'slow')      navigator.vibrate([250,100,250,100,250]);
+  else if (tipo === 'fast') navigator.vibrate([150,80,150]);
+  else                      navigator.vibrate(100);
+}
+function alertarCorredor(tipo, paceVal, alvoVal) {
+  falarPace(tipo, paceVal, alvoVal);
+  vibrar(tipo);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════════════════════════
+function setStatus(dotClass, texto) {
+  document.getElementById('statusDot').className = 'dot ' + dotClass;
+  document.getElementById('statusText').textContent = texto;
+}
+function atualizarAlerta(tipo, msg, icon) {
+  const box = document.getElementById('alertBox');
+  box.className = 'alert-box ' + tipo;
+  document.getElementById('alertIcon').textContent = icon;
+  document.getElementById('alertMsg').textContent = msg;
+}
+function atualizarPaceUI(pace, alvo) {
+  const el = document.getElementById('paceDisplay');
+  el.textContent = fmt(pace);
+  const diff = pace - alvo;
+  const diffSec = Math.round(diff * 60);
+  const badge = document.getElementById('diffBadge');
+  const sinal = diff > 0 ? '+' : '';
+  badge.textContent = sinal + diffSec + 's/km';
+  let tipo;
+  if (Math.abs(diff) <= 0.25) {
+    tipo = 'ok'; el.style.color = 'var(--ok)'; badge.className = 'diff-badge ok';
+    document.getElementById('ringArc').style.stroke = 'var(--ok)';
+  } else if (diff > 0.25) {
+    tipo = 'slow'; el.style.color = 'var(--danger)'; badge.className = 'diff-badge slow';
+    document.getElementById('ringArc').style.stroke = 'var(--danger)';
+  } else {
+    tipo = 'fast'; el.style.color = 'var(--accent)'; badge.className = 'diff-badge fast';
+    document.getElementById('ringArc').style.stroke = 'var(--accent)';
+  }
+  return tipo;
+}
+function atualizarProgresso() {
+  const pct = Math.min((distSegmento / 100) * 100, 100);
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progDist').textContent = Math.max(0, Math.round(100 - distSegmento)) + ' m';
+  document.getElementById('progKmLabel').textContent = 'km ' + (nSegmento - 1);
+  document.getElementById('progKmNext').textContent = 'km ' + nSegmento;
+  const circ = 427;
+  document.getElementById('ringArc').style.strokeDashoffset = circ - (pct / 100) * circ;
+}
+function atualizarMetricas() {
+  document.getElementById('mDist').textContent = (distTotal / 1000).toFixed(2);
+  document.getElementById('mKm').textContent = nSegmento;
+  document.getElementById('mSeg').textContent = segmentos;
+  document.getElementById('mTempo').textContent = fmtTempo(segundos);
+}
+function atualizarElevacao() {
+  document.getElementById('eGanho').textContent = ganhoKm.toFixed(0) + ' m';
+  document.getElementById('ePerda').textContent = perdaKm.toFixed(0) + ' m';
+  if (altDisp && eleKmInicio !== null) {
+    const incl = getInclinacao();
+    document.getElementById('eIncl').textContent = (incl >= 0 ? '+' : '') + incl.toFixed(1) + '%';
+  } else {
+    document.getElementById('eIncl').textContent = 'n/d';
+  }
+}
+function atualizarChart(paceAlvo) {
+  const svg = document.getElementById('liveChart');
+  svg.innerHTML = '';
+  if (historicoChart.length < 2) return;
+  const W = 340, H = 100;
+  const dados = historicoChart.slice(-20);
+  const alvos = historicoAlvo.slice(-20);
+  const n = dados.length;
+  const all = [...dados, ...alvos].filter(v => v > 0);
+  if (!all.length) return;
+  const minV = Math.min(...all) - 0.3, maxV = Math.max(...all) + 0.3;
+  const xOf = i => (i / (n-1)) * W;
+  const yOf = v => H - ((v - minV) / (maxV - minV)) * H;
+
+  // Linha alvo
+  const ya = yOf(alvos[alvos.length-1]);
+  const la = document.createElementNS('http://www.w3.org/2000/svg','line');
+  la.setAttribute('x1',0); la.setAttribute('x2',W);
+  la.setAttribute('y1',ya); la.setAttribute('y2',ya);
+  la.setAttribute('stroke','rgba(0,229,160,.3)');
+  la.setAttribute('stroke-dasharray','5 4'); la.setAttribute('stroke-width','1.5');
+  svg.appendChild(la);
+  const lt = document.createElementNS('http://www.w3.org/2000/svg','text');
+  lt.setAttribute('x',W-2); lt.setAttribute('y',ya-4);
+  lt.setAttribute('text-anchor','end'); lt.setAttribute('font-size','9');
+  lt.setAttribute('fill','rgba(0,229,160,.6)'); lt.setAttribute('font-family','Space Mono,monospace');
+  lt.textContent = fmt(alvos[alvos.length-1]); svg.appendChild(lt);
+
+  // Linha pace
+  let d = `M ${xOf(0)} ${yOf(dados[0])}`;
+  dados.forEach((v,i) => { if(i>0) d += ` L ${xOf(i)} ${yOf(v)}`; });
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',d); path.setAttribute('fill','none');
+  path.setAttribute('stroke','var(--accent)'); path.setAttribute('stroke-width','2');
+  path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round');
+  svg.appendChild(path);
+
+  const lx = xOf(n-1), ly = yOf(dados[n-1]);
+  const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  circ.setAttribute('cx',lx); circ.setAttribute('cy',ly);
+  circ.setAttribute('r','5'); circ.setAttribute('fill','var(--accent)');
+  svg.appendChild(circ);
+  const tv = document.createElementNS('http://www.w3.org/2000/svg','text');
+  tv.setAttribute('x', Math.min(lx+6, W-30)); tv.setAttribute('y', Math.max(ly-6, 10));
+  tv.setAttribute('font-size','9'); tv.setAttribute('fill','var(--accent)');
+  tv.setAttribute('font-family','Space Mono,monospace'); tv.setAttribute('font-weight','700');
+  tv.textContent = fmt(dados[n-1]); svg.appendChild(tv);
+}
+
+// Atualiza o painel visual de aprendizado
+function atualizarPainelAdaptacao() {
+  const painel = document.getElementById('painelAdaptacao');
+  const lista  = document.getElementById('adaptacaoLista');
+  if (!historicoAdaptacoes.length) { painel.style.display = 'none'; return; }
+
+  painel.style.display = 'block';
+  lista.innerHTML = historicoAdaptacoes.map(a => {
+    const cor   = Math.abs(a.errSec) <= 10 ? 'var(--ok)'
+                : a.errSec > 0             ? 'var(--danger)'
+                :                            'var(--accent)';
+    const sinal = a.errSec > 0 ? '+' : '';
+    const icone = Math.abs(a.errSec) <= 10 ? '✅' : a.errSec > 0 ? '🔴' : '🟢';
+    return `<span style="color:${cor}">${icone} km ${a.km} · previsto ${fmt(a.previsto)} · real ${fmt(a.real)} · erro ${sinal}${a.errSec}s → modelo ajustado</span>`;
+  }).join('<br>');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GPS HANDLER — mesma estrutura do 1.html, sem verificação de HTTPS
+// ═══════════════════════════════════════════════════════════════════════════
+function onPosicao(pos) {
+  const lat  = pos.coords.latitude;
+  const lon  = pos.coords.longitude;
+  const agora = Date.now();
+  const acc  = pos.coords.accuracy;
+  const ele  = pos.coords.altitude;
+
+  // Aceita até 50m (Samsung urbano); < 30m também atualiza elevação
+  if (acc > 50) {
+    setStatus('gps', 'GPS fraco (' + Math.round(acc) + 'm)');
+    return;
+  }
+
+  if (!rodando) return;
+
+  // Altitude — só usa se precisão ≤ 30m e variação plausível
+  if (ele !== null && ele !== undefined && acc <= 30) {
+    altDisp = true;
+    if (eleAtual !== null) {
+      const dEle = ele - eleAtual;
+      if (Math.abs(dEle) <= 15) { // ignora saltos absurdos de altitude
+        if (dEle > 0) ganhoKm += dEle;
+        else          perdaKm += Math.abs(dEle);
+      }
+    }
+    if (eleKmInicio === null) eleKmInicio = ele;
+    eleAtual = ele;
+  }
+
+  // Primeira posição — âncora, não calcula distância
+  if (!ultimaPos) {
+    ultimaPos = { lat, lon };
+    ultimoTempoPos = agora;
+    setStatus('running', 'GPS calibrado · ' + Math.round(acc) + 'm');
+    atualizarAlerta('neutral', 'GPS calibrado. Comece a correr!', '📍');
+    return;
+  }
+
+  const dt_ms = agora - ultimoTempoPos;
+  if (dt_ms < 500) return; // pontos muito próximos no tempo
+
+  const dist = haversine(ultimaPos.lat, ultimaPos.lon, lat, lon);
+
+  // Filtro de velocidade impossível (> 10 m/s = 36 km/h)
+  const velMs = dist / (dt_ms / 1000);
+  if (velMs > 10) {
+    ultimaPos = { lat, lon };
+    ultimoTempoPos = agora;
+    return;
+  }
+
+  // Acumular distâncias
+  distTotal    += dist;
+  distSegmento += dist;
+  distKmAtual  += dist;
+
+  // Pace suavizado
+  if (dt_ms > 500 && dist > 0.5) {
+    const pace = (1000 / velMs) / 60;
+    suavizarPace(pace);
+  }
+  paceAtual = getPace();
+
+  // Novo quilômetro
+  const novoSeg = Math.floor(distTotal / 1000) + 1;
+  if (novoSeg > nSegmento) {
+    // Adaptar modelo com o pace real do km que acabou de ser concluído
+    if (paceAtual > 0 && nSegmento >= 1) {
+      const inclKm = getInclinacao();
+      const fcKm   = simularFC(paceAtual, paceAlvo, CFG.fcMax || 190);
+      // Salvar km no registro para o painel
+      salvarKmNoRegistro(nSegmento, paceAtual, paceAlvo, fcKm, ganhoKm, perdaKm, inclKm);
+      // Adaptar modelo
+      adaptarModelo(
+        paceAtual, nSegmento, CFG.distTotal, CFG.genero, CFG.historico,
+        CFG.distMedia, CFG.nTreinos, ganhoKm, perdaKm, inclKm
+      );
+    }
+
+    nSegmento = novoSeg;
+    // Resetar acumuladores do km
+    ganhoKm = 0; perdaKm = 0;
+    distKmAtual = distTotal - Math.floor(distTotal / 1000) * 1000;
+    eleKmInicio = eleAtual;
+  }
+
+  // Calcular alvo do modelo para o km atual
+  const paceAlvo = calcPaceAlvo(
+    nSegmento, CFG.distTotal, CFG.genero, CFG.historico,
+    CFG.distMedia, CFG.nTreinos,
+    ganhoKm, perdaKm, getInclinacao()
+  );
+  document.getElementById('paceAlvo').textContent = fmt(paceAlvo);
+  document.getElementById('kmInfo').textContent =
+    `km ${nSegmento} de ${CFG.distTotal} · alvo: ${fmt(paceAlvo)} min/km`;
+
+  // ALERTA A CADA 100M
+  if (distSegmento >= 100) {
+    distSegmento -= 100;
+    segmentos++;
+    historicoChart.push(paceAtual);
+    historicoAlvo.push(paceAlvo);
+
+    const tipo = atualizarPaceUI(paceAtual, paceAlvo);
+
+    let icon, msg;
+    if (tipo === 'ok') {
+      icon = '✅'; msg = `Pace no alvo! ${fmt(paceAtual)} min/km — continue assim.`;
+      atualizarAlerta('fast', msg, icon);
+    } else if (tipo === 'slow') {
+      const d = Math.round((paceAtual - paceAlvo) * 60);
+      icon = '🔔'; msg = `Acelere! +${d}s acima do alvo. Atual: ${fmt(paceAtual)}.`;
+      atualizarAlerta('slow', msg, icon);
+    } else {
+      const d = Math.round((paceAlvo - paceAtual) * 60);
+      icon = '⚡'; msg = `Reduza! ${d}s abaixo do alvo. Atual: ${fmt(paceAtual)}.`;
+      atualizarAlerta('ok', msg, icon);
+    }
+
+    alertarCorredor(tipo, paceAtual, paceAlvo);
+    atualizarChart(paceAlvo);
+    document.getElementById('mSeg').textContent = segmentos;
+
+    // Zona FC a cada 100m + alerta de voz se FC muito alta
+    const zonaInfo = atualizarZonaFC(paceAtual, paceAlvo);
+    if (zonaInfo && zonaInfo.zona.idx >= 3) {
+      setTimeout(function(){ falar('Atenção. Frequência cardíaca elevada. ' + zonaInfo.alerta.detalhe); }, 2500);
+    }
+  } else {
+    if (paceAtual > 0) {
+      atualizarPaceUI(paceAtual, paceAlvo);
+      atualizarZonaFC(paceAtual, paceAlvo);
+    }
+  }
+
+  atualizarProgresso();
+  atualizarMetricas();
+  atualizarElevacao();
+
+  ultimaPos = { lat, lon };
+  ultimoTempoPos = agora;
+  setStatus('running', 'GPS ativo · ' + Math.round(acc) + 'm');
+}
+
+function onErroPOS(err) {
+  const msgs = {
+    1: 'Permissão negada. Vá em Configurações > Chrome > Localização e permita.',
+    2: 'GPS indisponível. Ative a Localização nas configurações do Android.',
+    3: 'GPS timeout. Vá para área com céu aberto.',
+  };
+  const msg = msgs[err.code] || 'Erro GPS desconhecido.';
+  setStatus('', 'Erro GPS');
+  atualizarAlerta('slow', '⚠️ ' + msg, '⚠️');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTROLES — mesma estrutura do 1.html, sem verificação de HTTPS
+// ═══════════════════════════════════════════════════════════════════════════
+function iniciar() {
+  if (!navigator.geolocation) {
+    atualizarAlerta('slow', 'Seu navegador não suporta GPS.', '⚠️');
+    return;
+  }
+
+  // Ler perfil
+  CFG = {
+    genero:    document.getElementById('inGenero').value,
+    historico: parseFloat(document.getElementById('inHistorico').value) || 5.5,
+    distTotal: parseFloat(document.getElementById('inDistTotal').value) || 10,
+    distMedia: parseFloat(document.getElementById('inDistMedia').value) || 13.177,
+    nTreinos:  parseInt(document.getElementById('inNTreinos').value)    || 51,
+    idade:     parseInt(document.getElementById('inIdade').value)       || 30,
+    fcMax:     220 - (parseInt(document.getElementById('inIdade').value) || 30),
+  };
+
+  // Inicializar estado
+  initAudio();
+  rodando = true;
+  distTotal = 0; distSegmento = 0; distKmAtual = 0;
+  nSegmento = 1; segmentos = 0; segundos = 0;
+  paceAtual = 0; paceBuffer = [];
+  ultimaPos = null; ultimoTempoPos = null;
+  ganhoKm = 0; perdaKm = 0;
+  eleKmInicio = null; eleAtual = null; altDisp = false;
+  historicoChart = []; historicoAlvo = [];
+
+  // Resetar modelo adaptativo e registros do treino
+  resetarModelo();
+  fcSimulada = 0;
+  registrosKm = [];
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  document.getElementById('setupCard').style.opacity = '.5';
+  document.getElementById('setupCard').style.pointerEvents = 'none';
+
+  // Alvo inicial (km 1, sem elevação ainda)
+  const alvoInicial = calcPaceAlvo(1, CFG.distTotal, CFG.genero, CFG.historico,
+                                    CFG.distMedia, CFG.nTreinos, 0, 0, 0);
+  document.getElementById('paceAlvo').textContent = fmt(alvoInicial);
+  document.getElementById('kmInfo').textContent =
+    `km 1 de ${CFG.distTotal} · alvo: ${fmt(alvoInicial)} min/km`;
+
+  setStatus('gps', 'Buscando GPS...');
+  atualizarAlerta('neutral', 'Aguardando sinal GPS. Fique parado por 3 segundos para calibrar.', '📡');
+
+  timerInterval = setInterval(() => { segundos++; atualizarMetricas(); }, 1000);
+
+  // GPS — chamada direta, igual ao 1.html
+  watchId = navigator.geolocation.watchPosition(onPosicao, onErroPOS, {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 10000
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIREBASE — banco de dados na nuvem
+// Qualquer celular salva, qualquer celular lê no painel
+// ═══════════════════════════════════════════════════════════════════════════
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, addDoc, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyAbeBitYPG5CZrPKx6j_WkjHvh0MPDpl3Y',
+  authDomain:        'dadoscorredores.firebaseapp.com',
+  projectId:         'dadoscorredores',
+  storageBucket:     'dadoscorredores.firebasestorage.app',
+  messagingSenderId: '409962441764',
+  appId:             '1:409962441764:web:0c09a7b230548799983cb1',
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db    = getFirestore(fbApp);
+
+// Registros de cada km para salvar no Firebase
+let registrosKm = [];
+
+function salvarKmNoRegistro(nKm, paceReal, paceAlvoKm, fcKm, ganho, perda, incl) {
+  const zoneInfo = CFG.fcMax ? determinarZona(fcKm, CFG.fcMax) : null;
+  registrosKm.push({
+    km:        nKm,
+    ritmo:     paceReal,
+    score:     Math.min(10, Math.max(1, Math.round(paceReal / paceAlvoKm * 5))),
+    scoreIA:   Math.round(paceAlvoKm * 10) / 10,
+    fc:        fcKm,
+    zoneIdx:   zoneInfo ? zoneInfo.zona.idx : 2,
+    zoneLabel: zoneInfo ? zoneInfo.zona.nome : 'Zona 3 — Médio',
+    ganho:     ganho,
+    perda:     perda,
+    terr:      incl > 2 ? 'subida' : incl < -2 ? 'descida' : 'plano',
+    alerta:    { nivel: 'Manter', cor: '#2fb8a6' },
+    ajuste:    { direcao: 'manter', deltaRitmo: 0 },
+  });
+}
+
+async function salvarTreinoNoPainel() {
+  if (!registrosKm.length) return false;
+  try {
+    const avgScore   = registrosKm.reduce((s,x)=>s+x.score,0) / registrosKm.length;
+    const avgFc      = registrosKm.reduce((s,x)=>s+x.fc,0)    / registrosKm.length;
+    const maxFc      = Math.max(...registrosKm.map(x=>x.fc));
+    const ganhoTotal = registrosKm.reduce((s,x)=>s+x.ganho,0);
+    const perdaTotal = registrosKm.reduce((s,x)=>s+x.perda,0);
+
+    const record = {
+      ts:          serverTimestamp(),
+      tsLocal:     Date.now(),
+      distKm:      Math.round((distTotal/1000)*10)/10,
+      tempoSeg:    segundos,
+      genero:      CFG.genero,
+      idade:       CFG.idade || null,
+      fcMax:       CFG.fcMax || null,
+      avgScore, avgFc, maxFc, ganhoTotal, perdaTotal,
+      fonte:       'PaceRunner GPS',
+      rows:        registrosKm,
+    };
+
+    // Salva na coleção "treinos" do Firestore
+    await addDoc(collection(db, 'treinos'), record);
+    return true;
+  } catch(e) {
+    console.error('Erro ao salvar no Firebase:', e);
+    return false;
+  }
+}
+
+async function parar() {
+  rodando = false;
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  clearInterval(timerInterval);
+
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('setupCard').style.opacity = '1';
+  document.getElementById('setupCard').style.pointerEvents = 'auto';
+  setStatus('ok', 'Finalizado');
+
+  const distKm = (distTotal / 1000).toFixed(2);
+  const paceMedia = distTotal > 0 && segundos > 0 ? (segundos / 60) / (distTotal / 1000) : 0;
+  const salvo = await salvarTreinoNoPainel();
+  const msgSalvo = salvo ? ' · ✅ Salvo no painel!' : '';
+  atualizarAlerta('fast',
+    '🏁 Encerrado! ' + distKm + ' km · Pace médio: ' + fmt(paceMedia) + ' · Tempo: ' + fmtTempo(segundos) + msgSalvo,
+    '🏁'
+  );
+
+  if (synth) synth.cancel();
+  const utt = new SpeechSynthesisUtterance(
+    `Treino encerrado. ${distKm} quilômetros em ${fmtTempo(segundos)}. Pace médio ${fmt(paceMedia)} por quilômetro.`
+  );
+  utt.lang = 'pt-BR'; utt.rate = 1;
+  if (synth) synth.speak(utt);
+  navigator.vibrate && navigator.vibrate([300,100,300,100,300]);
+}
+</script>
+</body>
+</html>
