@@ -975,24 +975,23 @@ function iniciar() {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FIREBASE — banco de dados na nuvem
-// Qualquer celular salva, qualquer celular lê no painel
-// ═══════════════════════════════════════════════════════════════════════════
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, addDoc, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey:            'AIzaSyAbeBitYPG5CZrPKx6j_WkjHvh0MPDpl3Y',
-  authDomain:        'dadoscorredores.firebaseapp.com',
-  projectId:         'dadoscorredores',
-  storageBucket:     'dadoscorredores.firebasestorage.app',
-  messagingSenderId: '409962441764',
-  appId:             '1:409962441764:web:0c09a7b230548799983cb1',
+  apiKey: "AIzaSyAbeBitYPG5CZrPKx6j_WkjHvh0MPDpl3Y",
+  authDomain: "dadoscorredores.firebaseapp.com",
+  projectId: "dadoscorredores",
+  storageBucket: "dadoscorredores.firebasestorage.app",
+  messagingSenderId: "409962441764",
+  appId: "1:409962441764:web:0c09a7b230548799983cb1"
 };
 
-const fbApp = initializeApp(firebaseConfig);
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 const db    = getFirestore(fbApp);
 
 // Registros de cada km para salvar no Firebase
